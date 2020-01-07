@@ -84,6 +84,3 @@ class Trie:
         print(self.__list_words(self.root))
 
 
-
-
-print('a'>'A')

@@ -31,8 +31,13 @@ class Notepad(Tk):
                 ],
             "run":
                 [
-                    "Compiles and runs specified Program. (Only PYTHON is supported for now )",
+                    "Compiles and runs specified Program. (Python ,Java ,C/C++)",
                     self.run
+                ],
+            "compile":
+                [
+                    "Compiles specified Program. (Python ,Java ,C/C++)",
+                    self.compile
                 ],
             "ls":
                 [
@@ -71,7 +76,7 @@ class Notepad(Tk):
                 ]
         }
         self.activeFile = None
-        self.working_directory="/home/chandan/PycharmProjects/Editor/"
+        self.working_directory="/home/chandan/PycharmProjects/Editor/java_practice/sims/"
         self.openFiles=[]
         self.tabs=[]
         self.fileCache=[]
@@ -104,33 +109,22 @@ class Notepad(Tk):
         self.bind("<Control-n>", self.new)
         self.bind("<Control-o>", self.askOpen)
         self.bind("<Control-r>", self.openOutputWindow)
-        self.text.bind("<Control-o>", self.askOpen)
         self.bind("<Escape>", self.commandMode)
+        self.text.bind("<Control-o>", self.askOpen)
         self.text.bind("<Control-s>", self.save)
         self.text.bind("<Control-a>", self.selectAll)
-        self.text.bind("<Control-D>", self.duplicateLine)
+        self.text.bind("<Control-Shift-d>", self.duplicateLine)
+        self.text.bind("<Control-d>", self.nextMatch)
         self.text.bind("<Control-z>", self.undo)
         self.text.bind("<Control-y>", self.redo)
+        self.text.bind("<Control-Tab>", self.nextTab)
         self.text.bind("<Control-Return>", lambda x:self.run(self.activeFile.split("/")[-1], shortcut=True))
+        self.text.bind("<Control-Shift-Return>", lambda x:self.compile(self.activeFile.split("/")[-1], shortcut=True))
         self.command.bind("<Tab>", self.suggest)
         self.command.bind("<Return>", self.runCommand)
         self.command.bind("<FocusOut>",self.addPlaceholder)
         self.command.bind("<FocusIn>",self.removePlaceholder)
         self.protocol("WM_DELETE_WINDOW", self.exit)
-        # kmap={}
-        # kmap["builtins"]={
-        #     "keywords":self.keywords,
-        #     "functions":self.methods
-        # }
-        # x={}
-        # f = open("py.json","r")
-        # x=json.load(f)
-        # print(x)
-        # f.close()
-        # s=""
-        # for k in x["builtins"]["keywords"]:
-        #     s+=k+"\n"
-        # self.input.insert(1.0,s)
 
     def writeResponse(self,res):
         self.response.config(state=NORMAL)
@@ -158,8 +152,11 @@ class Notepad(Tk):
             self.response.config(state=DISABLED)
         else:
             command = command[1:].split(" ")
+            print("command1",command)
             command=list(filter(lambda x: x != "", command))
+            print("command2 ",command)
             fun,args = command[0],command[1:]
+            print("fun , args ",fun , args)
             if len(command)==2 and args[0]=="-help":
                 status=self.command_map[fun][0]
             else:
@@ -168,6 +165,57 @@ class Notepad(Tk):
             self.response.delete(0,END)
             self.response.insert(0,status)
             self.response.config(state=DISABLED)
+
+    def generateCompileRunCommand(self,file,mode="run"):
+        location = self.working_directory
+        if (location[-1] != "/"):
+            location += "/"
+        extension = file.split(".")[-1]
+        command = ""
+        if (extension == "py"):
+            if(mode == "run"):
+                command = f"python {location}{file}"
+            elif(mode == "compile"):
+                return False
+
+
+        elif (extension == "cpp"):
+            if(mode=="run"):
+                command = f"cd '{location}' && g++ {file} -o {file.split('.')[0]} && '{location}'{file.split('.')[0]}"
+            elif (mode == "compile"):
+                command = f"cd '{location}' && g++ {file} -o {file.split('.')[0]}"
+
+
+        elif (extension == "c"):
+            if (mode == "run"):
+                command = f"cd '{location}' && gcc {file} -o {file.split('.')[0]} && '{location}'{file.split('.')[0]}"
+            elif(mode == "compile"):
+                command = f"cd '{location}' && gcc {file} -o {file.split('.')[0]}"
+
+
+        elif (extension == "java"):
+            i = self.activeIndex()
+            text = self.fileCache[i].lstrip()
+            firstword = ""
+            for ch in text:
+                if (ch != " "):
+                    firstword += ch
+                else:
+                    break
+            if (firstword == "package"):
+                if(mode=="run"):
+                    command = f"cd '{location}' && javac -d . {file} && java {file.split('.')[0]}"
+                elif(mode=="compile"):
+                    command = f"cd '{location}' && javac -d . {file}"
+            else:
+                if (mode == "run"):
+                    command = f"cd '{location}' && javac {file} && java {file.split('.')[0]}"
+                elif (mode == "compile"):
+                    command = f"cd '{location}' && javac {file}"
+
+
+
+        return command
 
     def run(self,*args,shortcut=False):
         if(not self.outputShown):
@@ -182,25 +230,12 @@ class Notepad(Tk):
         if("*" in file ):
             file=file[:-1]
 
-        location = self.working_directory
-        if(location[-1]!="/"):
-            location+="/"
-        extension = file.split(".")[-1]
-        command=""
-        if(extension=="py"):
-            command=f"python {location}{file}"
-        elif(extension=="cpp"):
-            command= f"cd '{location}' && g++ {file} -o {file.split('.')[0]} && '{location}'{file.split('.')[0]}"
-        elif(extension=="c"):
-            command= f"cd '{location}' && gcc {file} -o {file.split('.')[0]} && '{location}'{file.split('.')[0]}"
-
+        command = self.generateCompileRunCommand(file=file, mode="run")
         output = "Make Sure all inputs are seperated by newline !!\n"
         error=""
         exit_status=""
         timeout=2
         input=self.input.get(1.0,END)
-        # if(input[-1]!="\n"):
-        #     input+="\n"
         try:
             res = sp.run(command, stdout=sp.PIPE, input=input,
                          stderr=sp.PIPE, check=True, timeout=timeout, encoding='utf-8', shell=True)
@@ -236,19 +271,70 @@ class Notepad(Tk):
             self.output.tag_add("exit_status", start, END)
             self.output.config(state=DISABLED)
 
-            # r = sp.Popen(f"python {location}{file}", stdout=sp.PIPE, stdin=sp.PIPE, shell=True, stderr=sp.PIPE)
-            # r.stdin.write("1\n2\n".encode("utf-8"))
-            # r.stdin.flush()
-            # while True:
-            #     line = r.stdout.readline()
-            #     if not line:
-            #         break
-            #     else:
-            #         print(line.decode())
             if shortcut:
                 return "break"
             else:
                 return command
+
+
+    def compile(self,*args,shortcut=False):
+        if(not self.outputShown):
+            self.openOutputWindow()
+        if (not args):
+            self.output.config(state=NORMAL)
+            self.output.delete(1.0, END)
+            self.output.insert(1.0, "No File Selected or No Arguments were passed in command")
+            self.output.config(state=NORMAL)
+            return "No file Selected/ No arguements"
+
+        file=args[0]
+        if("*" in file ):
+            file=file[:-1]
+
+        command = self.generateCompileRunCommand(file=file, mode="compile")
+        output, error, exit_status = "", "", ""
+        timeout=5
+        try:
+            res = sp.run(command, stdout=sp.PIPE,
+                         stderr=sp.PIPE, check=True, timeout=timeout, encoding='utf-8', shell=True)
+
+        except sp.CalledProcessError as err:
+            error=err.stderr
+            output=f"{err.stdout}"
+            exit_status+=f"\nProcess returned with exit code {err.returncode}"
+        except sp.TimeoutExpired as err:
+            args = " ".join(err.args[0])
+            output = err.stdout
+            error=err.stderr
+            exit_status=f"\nTimeoutExpired : Command '{args}' timed out after {timeout}s"
+        except Exception as err:
+            print("error : ",err)
+            error=err
+            output=""
+
+        else:
+            print("no exception : ",res)
+            error=""
+            output=f"File Compiled Successfully.\n"
+            exit_status = f"\nProcess returned with exit code {res.returncode}"
+        finally:
+            self.output.config(state=NORMAL)
+            self.output.delete(1.0,END)
+            self.output.insert(1.0, output)
+            start = self.output.index("end-1 lines")
+            self.output.insert(END, error)
+            self.output.tag_add("error_msg",start,f"end-1 lines")
+            start=self.output.index("end-1 lines")
+            self.output.insert(END, exit_status)
+            self.output.tag_add("exit_status", start, END)
+            self.output.config(state=DISABLED)
+
+            if shortcut:
+                return "break"
+            else:
+                return command
+
+
 
 
 
@@ -333,14 +419,19 @@ class Notepad(Tk):
     def saveFiles(self,*args):
         pass
     def newFile(self,*args):
-        i,exists=0,""
+        i,exists,existmsg,newmsg=0,"","",""
         for file in args:
-            ok = self.new(file=file)
+            ok = self.new(file=self.working_directory+file)
             if not ok:
                 exists+=file+" ,"
             else:
                 i+=1
-        return f"Created {i} new files. {exists[:-1]} already exists! "
+        if(exists):
+            existmsg=f"{exists[:-1]} already exists! "
+        if(i):
+            newmsg=f"Created {i} new files."
+        return newmsg+"\t\t"+existmsg
+
     def openFiles(self,*args):
         count,fails=0,0
         for file in args:
@@ -492,7 +583,6 @@ class Notepad(Tk):
         last_char=""
         if(word):
             last_char = word[-1]
-        print(f"word :{word} , lastchar:{last_char}")
         autocompleted=False
         if(
                 ( last_char>='a' and last_char<='z') \
@@ -503,8 +593,6 @@ class Notepad(Tk):
             ):
 
             word=word.strip()
-
-            print("auto ",word)
             autocompleted = self.autocomplete(word)
         elif(not autocompleted):
             self.text.insert(INSERT, " " * 4)
@@ -512,9 +600,8 @@ class Notepad(Tk):
 
     def enter(self,*args):
         thisline = self.text.get("insert linestart","insert lineend")
-        for i in range(len(thisline)):
-            if(thisline[i]!=" "):
-                break
+        nospaceline = thisline.lstrip()
+        i=len(thisline)-len(nospaceline)
         self.text.insert("insert","\n"+" "*i)
         return "break"
 
@@ -558,7 +645,40 @@ class Notepad(Tk):
         self.text.bind("<Return> ", self.enter)
 
         self.scrollbar.config(command=self.scrollBoth)
+    def nextMatch(self,*args):
+        word = self.text.selection_get()
+        print("word is ", word)
+        text = self.text.get("1.0","end")
+        linenunber,column,i =1,0,0
+        length,sublen = len(text),len(word)
+        while i < length:
+            print("line col i",linenunber,column, i, end=" -- ")
+            if(text[i] == "\n"):
+                i+=1
+                linenunber+=1
+                column=0
+                continue
+            if (i+sublen<length ):
+                print(repr(text[i:i+sublen]),word)
+                if(text[i:i+sublen]==word):
+                    self.text.tag_add(SEL,f"{linenunber}.{column}",f"{linenunber}.{column+sublen}")
+                    print("marked ",linenunber, column , column+sublen)
+                    i += sublen
+                    column += sublen
+                    for j in range(sublen):
+                        if(text[i+j] == "\n"):
+                            linenunber+=1
+                else:
+                    i+=1
+                    column+=1
+            else:
+                break
+            i+=1
+            column+=1
 
+
+
+        return "break"
     def colorWord(self,word,linenum,first,last,string=False):
         start_index = f"{linenum}.{first}"
         end_index = f"{linenum}.{last}"
@@ -607,10 +727,11 @@ class Notepad(Tk):
                 string=False
             i+=1
 
+
+
     def textUpdated(self, event=None):
         #24 => Alt, 20 =>Ctrl , 17 => Shift   these will be shortcut keys
         # print("pressed ",event.keysym,event.keycode,event.state)
-
         if event!=None and event=="saved":
             pass
         elif((event==None or event.state not in [17,24,20]) and event!="state" ):
@@ -624,6 +745,12 @@ class Notepad(Tk):
                     if self.openFiles[i] == self.activeFile:
                         self.activeFile+="*"
                         self.tabs[i]["tab"].config(text=self.activeFile.split("/")[-1])
+
+        if(event and event!="state"):
+            brackets={"<": ">" , "{": "}", "(": ")","[": "]"}
+            if(event.char in  brackets):
+                self.text.insert("insert",brackets[event.char])
+                self.text.mark_set("insert","insert-1c")
 
 
 
@@ -683,6 +810,15 @@ class Notepad(Tk):
         self.show()
         self.textUpdated()
         self.updateActivePanel()
+
+    def nextTab(self,*args):
+        i = self.activeIndex()
+        if(i<len(self.openFiles)-1):
+            self.changePanel(self.openFiles[i+1])
+        else:
+            self.changePanel(self.openFiles[0])
+        return "break"
+
     def removeStar(self,file):
         if(file!=None and file[-1]=="*"):
             file=file[:-1]
@@ -762,7 +898,7 @@ class Notepad(Tk):
         if("*" in self.activeFile):
             self.activeFile = self.activeFile[:-1]
         print("Saving ",self.activeFile)
-        newfile = "Untitled" in self.activeFile
+        newfile = "/" not in self.activeFile
         temp=False
         if newfile:
             temp = asksaveasfilename(initialfile="Untitled.txt" ,
@@ -824,17 +960,18 @@ class Notepad(Tk):
 
 
 
-    def new(self,file=None,*args):
+    def new(self,*args,file=None):
         if(self.activeFile):
             self.storeCache(self.activeFile)
             self.text.delete(1.0, END)
+            print("file",file)
 
         if(file):
             if(os.path.isfile(file)):
                 return False
             else:
                 f = open(file,"w")
-                new_file_name=file.split("/")[-1]
+                new_file_name=file
         else:
             new_file_name="Untitled"
             i=1
@@ -865,7 +1002,8 @@ class Notepad(Tk):
             return "File or Directory Does not Exists!"
 
     def selectAll(self,*args):
-        self.text.tag_add("sel",1.0,END)
+        # self.text.tag_add("sel",1.0,END)
+        self.text.tag_add(SEL, "1.0", END)
         return "break"
 
     def duplicateLine(self,*args):
