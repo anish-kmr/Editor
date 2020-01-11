@@ -4,9 +4,9 @@ block_cipher = None
 
 
 a = Analysis(['editor.py'],
-             pathex=['/home/chandan/PycharmProjects/Editor'],
+             pathex=['G:\\anish\\Editor\\Editor'],
              binaries=[],
-             datas=[],
+             datas=[('py1.ico','.')],
              hiddenimports=[],
              hookspath=[],
              runtime_hooks=[],
@@ -30,4 +30,4 @@ exe = EXE(pyz,
           upx=True,
           upx_exclude=[],
           runtime_tmpdir=None,
-          console=False )
+          console=False , icon='py1.ico')

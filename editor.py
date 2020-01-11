@@ -1,15 +1,12 @@
 from tkinter import *
 import builtins
-from tkinter.ttk import Combobox
 from tkinter.messagebox import askyesnocancel
 from tkinter.filedialog import asksaveasfilename,askopenfilename
 from keyword import kwlist
 from shutil import rmtree
 import os
 import subprocess as sp
-from re import split
 from trie import Trie
-import json
 
 
 
@@ -17,6 +14,16 @@ import json
 class Notepad(Tk):
     def __init__(self):
         super().__init__()
+
+        if getattr(sys, 'frozen', False):
+            application_path = sys._MEIPASS
+        elif __file__:
+            application_path = os.path.dirname(__file__)
+        iconFile = 'py1.ico'
+
+        self.iconbitmap(default=os.path.join(application_path, iconFile))
+
+
         self.menuItems = {"File" : ["Open", "New", "Save", "Settings", "Exit"],
                           "Edit" : ["Cut", "Copy", "Paste"],
                           "View" : ["Coming Soon..."],
@@ -76,7 +83,8 @@ class Notepad(Tk):
                 ]
         }
         self.activeFile = None
-        self.working_directory="/home/chandan/PycharmProjects/Editor/java_practice/sims/"
+        # self.working_directory="/home/chandan/PycharmProjects/Editor/java_practice/sims/"
+        self.working_directory="C:/"
         self.openFiles=[]
         self.tabs=[]
         self.fileCache=[]
@@ -114,7 +122,7 @@ class Notepad(Tk):
         self.text.bind("<Control-s>", self.save)
         self.text.bind("<Control-a>", self.selectAll)
         self.text.bind("<Control-Shift-d>", self.duplicateLine)
-        self.text.bind("<Control-d>", self.nextMatch)
+        # self.text.bind("<Control-d>", self.nextMatch)
         self.text.bind("<Control-z>", self.undo)
         self.text.bind("<Control-y>", self.redo)
         self.text.bind("<Control-Tab>", self.nextTab)
@@ -128,21 +136,23 @@ class Notepad(Tk):
 
     def writeResponse(self,res):
         self.response.config(state=NORMAL)
+        self.response.delete(0,END)
         self.response.insert(0, res)
         self.response.config(state=DISABLED)
 
     def addPlaceholder(self,*args):
         if(not self.command.get()):
             self.command.insert(0,"#Press Esc to enter a command....For all commands, run :list ")
-            self.command.config(fg="#707070",font="symbol 12 italic")
+            self.command.config(fg="#707070",font="courier 12 italic")
 
     def removePlaceholder(self,*args):
         self.command.delete(0,END)
-        self.command.config(fg='white', font = "symbol 14 normal")
+        self.command.config(fg='white', font = "courier 14 normal")
 
     def commandMode(self,*args):
         self.command.delete(0,END)
         self.command.focus_set()
+
     def runCommand(self,*args):
         command = self.command.get()
         self.command.delete(0,END)
@@ -181,14 +191,14 @@ class Notepad(Tk):
 
         elif (extension == "cpp"):
             if(mode=="run"):
-                command = f"cd '{location}' && g++ {file} -o {file.split('.')[0]} && '{location}'{file.split('.')[0]}"
+                command = f"cd {location} && g++ {file} -o {file.split('.')[0]} && '{location}'{file.split('.')[0]}"
             elif (mode == "compile"):
-                command = f"cd '{location}' && g++ {file} -o {file.split('.')[0]}"
+                command = f"cd {location} && g++ {file} -o {file.split('.')[0]}"
 
 
         elif (extension == "c"):
             if (mode == "run"):
-                command = f"cd '{location}' && gcc {file} -o {file.split('.')[0]} && '{location}'{file.split('.')[0]}"
+                command = f"cd {location} && gcc {file} -o {file.split('.')[0]} && '{location}'{file.split('.')[0]}"
             elif(mode == "compile"):
                 command = f"cd '{location}' && gcc {file} -o {file.split('.')[0]}"
 
@@ -204,14 +214,14 @@ class Notepad(Tk):
                     break
             if (firstword == "package"):
                 if(mode=="run"):
-                    command = f"cd '{location}' && javac -d . {file} && java {file.split('.')[0]}"
+                    command = f"cd {location} && javac -d . {file} && java {file.split('.')[0]}"
                 elif(mode=="compile"):
-                    command = f"cd '{location}' && javac -d . {file}"
+                    command = f"cd {location} && javac -d . {file}"
             else:
                 if (mode == "run"):
-                    command = f"cd '{location}' && javac {file} && java {file.split('.')[0]}"
+                    command = f"cd {location} && javac {file} && java {file.split('.')[0]}"
                 elif (mode == "compile"):
-                    command = f"cd '{location}' && javac {file}"
+                    command = f"cd {location} && javac {file}"
 
 
 
@@ -231,6 +241,8 @@ class Notepad(Tk):
             file=file[:-1]
 
         command = self.generateCompileRunCommand(file=file, mode="run")
+        self.writeResponse(command)
+        print(command)
         output = "Make Sure all inputs are seperated by newline !!\n"
         error=""
         exit_status=""
@@ -474,7 +486,7 @@ class Notepad(Tk):
     def commandPanel(self):
         frame = Frame(self, height=30, bg="#212121")
 
-        self.command = Entry(frame, bg="#212121",fg="white", highlightthickness=0, bd=0, font="symbol 14 normal",
+        self.command = Entry(frame, bg="#212121",fg="white", highlightthickness=0, bd=0, font="courier 14 normal",
                              insertbackground="white")
         self.addPlaceholder()
         self.command.pack(expand=1,fill=BOTH)
@@ -498,7 +510,7 @@ class Notepad(Tk):
             input_label.pack(anchor="w")
             input_scroll = Scrollbar(self.input_frame)
             input_scroll.pack(side=RIGHT, fill=Y)
-            self.input = Text(self.input_frame, bg="#212121", width=30, fg="white",padx=5, font="symbol 14 " \
+            self.input = Text(self.input_frame, bg="#212121", width=30, fg="white",padx=5, font="courier 14 " \
                                                                                                           "normal",
                               insertbackground="white",yscrollcommand=input_scroll.set,highlightthickness=0)
             self.input.pack(side=LEFT)
@@ -523,7 +535,7 @@ class Notepad(Tk):
             output_scroll=Scrollbar(self.output_frame)
             output_scroll.pack(side=RIGHT,fill=Y)
 
-            self.output = Text(self.output_frame, bg="#212121", fg="white", font="symbol 14 normal",
+            self.output = Text(self.output_frame, bg="#212121", fg="white", font="courier 14 normal",
                                padx=5, state=DISABLED,yscrollcommand=output_scroll.set, highlightthickness=0)
             self.output.pack(side=LEFT, fill=X,expand=1)
 
@@ -532,7 +544,7 @@ class Notepad(Tk):
 
 
             self.output.tag_configure("error_msg", foreground='#FF2500')
-            self.output.tag_configure("exit_status", font="symbol 14 italic")
+            self.output.tag_configure("exit_status", font="courier 14 italic")
     def closeOutputWindow(self):
         self.io_frame.grid_forget()
         self.frame.grid_rowconfigure(0,weight=1)
@@ -1073,7 +1085,7 @@ class Settings(Tk):
         self.geometry(f"{int(notepad.width/2)}x{int(notepad.height)}+{int(notepad.width/2)}+0")
         self.categories = ["Appearance", "Editor"]
         self.font_size_options=[i for i in range(8,48)]
-        self.font_face_options=["Arial", "Courier", "Times", "Symbol"]
+        self.font_face_options=["Arial", "Courier", "Times", "courier"]
         self.font_style_options=["Normal", "Bold", "Italic", "Bold Italic"]
         self.activeTab=None
         self.tabsPanel()
@@ -1086,7 +1098,7 @@ class Settings(Tk):
             tf = Frame(self.panel_frame, bd=1, height=25, width=125, bg="#212121")
             tf.pack(fill=X, side=LEFT)
             tabs = Button(tf, text=c, width=12, height=2, bg="#353535", fg="white", anchor="nw", bd=0,
-                          highlightthickness=0, relief=SUNKEN, command=lambda: self.changePanel(c))
+                          highlightthickness=0, relief=SUNKEN, command=lambda: 1)
             tabs.place(in_=tf, x=0, y=0)
         self.activeTab=self.categories[0]
 
@@ -1164,5 +1176,6 @@ class Settings(Tk):
 
 
 w=Notepad()
+
 w.new()
 w.done()
