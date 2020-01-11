@@ -84,7 +84,7 @@ class Notepad(Tk):
         }
         self.activeFile = None
         # self.working_directory="/home/chandan/PycharmProjects/Editor/java_practice/sims/"
-        self.working_directory="C:/"
+        self.working_directory="G:/anish/"
         self.openFiles=[]
         self.tabs=[]
         self.fileCache=[]
@@ -113,6 +113,9 @@ class Notepad(Tk):
         self.tabsPanel()
         self.textArea()
 
+
+        self.findnextword=""
+
         self.settings_window=None
         self.bind("<Control-n>", self.new)
         self.bind("<Control-o>", self.askOpen)
@@ -122,7 +125,7 @@ class Notepad(Tk):
         self.text.bind("<Control-s>", self.save)
         self.text.bind("<Control-a>", self.selectAll)
         self.text.bind("<Control-Shift-d>", self.duplicateLine)
-        # self.text.bind("<Control-d>", self.nextMatch)
+        self.text.bind("<Control-d>", self.nextMatch)
         self.text.bind("<Control-z>", self.undo)
         self.text.bind("<Control-y>", self.redo)
         self.text.bind("<Control-Tab>", self.nextTab)
@@ -658,39 +661,44 @@ class Notepad(Tk):
 
         self.scrollbar.config(command=self.scrollBoth)
     def nextMatch(self,*args):
-        word = self.text.selection_get()
-        print("word is ", word)
-        text = self.text.get("1.0","end")
-        linenunber,column,i =1,0,0
-        length,sublen = len(text),len(word)
-        while i < length:
-            print("line col i",linenunber,column, i, end=" -- ")
-            if(text[i] == "\n"):
-                i+=1
-                linenunber+=1
-                column=0
-                continue
-            if (i+sublen<length ):
-                print(repr(text[i:i+sublen]),word)
-                if(text[i:i+sublen]==word):
-                    self.text.tag_add(SEL,f"{linenunber}.{column}",f"{linenunber}.{column+sublen}")
-                    print("marked ",linenunber, column , column+sublen)
-                    i += sublen
-                    column += sublen
-                    for j in range(sublen):
-                        if(text[i+j] == "\n"):
-                            linenunber+=1
-                else:
-                    i+=1
-                    column+=1
-            else:
-                break
-            i+=1
-            column+=1
-
+        if(not self.findnextword):
+            try:
+                self.findnextword = self.text.selection_get()
+            except:
+                return "break"
+        word= self.findnextword
+        index = self.text.search(word,"sel.last","end")
+        if (not index):
+            index = self.text.search(word,"1.0","sel.first")
+        if index:
+            line,col = map(int,index.split("."))
+            self.text.tag_add("sel",f"{line}.{col}",f"{line}.{col+len(word)}")
 
 
         return "break"
+
+    def allMatch(self,*args):
+        if(not self.findnextword):
+            self.findnextword = self.text.selection_get()
+        word= self.findnextword
+        text = self.text.get("1.0","end")
+        length,sublen = len(text),len(word)
+        line,col=1,0
+        for i in range(length):
+            if(text[i] == '\n'):
+                line+=1
+                col=0
+                continue
+            if(i+sublen<length):
+                print(f"{line}.{col}",end=" ")
+                if(text[i:i+sublen]==word):
+                    self.text.tag_add("sel",f"{line}.{col}",f"{line}.{col+sublen}")
+                    break
+
+            col+=1
+        print(line)
+        return "break"
+
     def colorWord(self,word,linenum,first,last,string=False):
         start_index = f"{linenum}.{first}"
         end_index = f"{linenum}.{last}"
@@ -706,7 +714,8 @@ class Notepad(Tk):
         end_index = f"{linenum}.{last}"
         if(not string):
             for tag in self.text.tag_names():
-                self.text.tag_remove(tag,start_index,end_index)
+                if(tag!="sel"):
+                    self.text.tag_remove(tag,start_index,end_index)
 
         # tagindexes = self.text.tag_nextrange("orange", start_index, end_index)
         # if tagindexes:
@@ -1016,6 +1025,7 @@ class Notepad(Tk):
     def selectAll(self,*args):
         # self.text.tag_add("sel",1.0,END)
         self.text.tag_add(SEL, "1.0", END)
+        self.text.mark_set(INSERT,"1.0")
         return "break"
 
     def duplicateLine(self,*args):
