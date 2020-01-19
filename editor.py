@@ -1,20 +1,27 @@
 from tkinter import *
+from tkinter import font
 import builtins
 from tkinter.messagebox import askyesnocancel
+from tkinter.ttk import Combobox
 from tkinter.filedialog import asksaveasfilename,askopenfilename
 from keyword import kwlist
 from shutil import rmtree
 import os
 import subprocess as sp
 from trie import Trie
+import logging as log
 
-
-
+class Icons:
+    def __init__(self):
+        self.up_arrow = PhotoImage(file="icons/up.png").subsample(60,60)
+        self.down_arrow = PhotoImage(file="icons/down.png").subsample(60,60)
+        self.times = PhotoImage(file="icons/close.png").subsample(25,25)
 
 class Notepad(Tk):
     def __init__(self):
         super().__init__()
-
+        self.icons = Icons()
+        log.info("Launching Editor")
         if getattr(sys, 'frozen', False):
             application_path = sys._MEIPASS
         elif __file__:
@@ -82,6 +89,9 @@ class Notepad(Tk):
                     self.openFiles
                 ]
         }
+        self.is_command_placeholder=False
+        self.is_find_placeholder=False
+        self.is_replace_placeholder=False
         self.activeFile = None
         # self.working_directory="/home/chandan/PycharmProjects/Editor/java_practice/sims/"
         self.working_directory="G:/anish/"
@@ -105,9 +115,11 @@ class Notepad(Tk):
 
         self.title("Notepad")
         self.wait_visibility(self)
-        self.geometry(f"{self.width}x{self.height}")
-        # self.geometry(f"{int(self.width / 2)}x{int(self.height)}+{int(self.width / 2)}+0")
+        # self.geometry(f"{self.width}x{self.height}+0+0")
 
+        self.geometry(f"{int(self.width / 2)}x{int(self.height)}+{int(self.width / 2)}+0")
+        # self.attributes('-fullscreen', True)
+        self.wm_state('zoomed')
         self.menuBar()
         self.commandPanel()
         self.tabsPanel()
@@ -118,23 +130,36 @@ class Notepad(Tk):
 
         self.settings_window=None
         self.bind("<Control-n>", self.new)
+        self.bind("<Control-N>", self.new)
         self.bind("<Control-o>", self.askOpen)
+        self.bind("<Control-O>", self.askOpen)
         self.bind("<Control-r>", self.openOutputWindow)
+        self.bind("<Control-R>", self.openOutputWindow)
         self.bind("<Escape>", self.commandMode)
         self.text.bind("<Control-o>", self.askOpen)
+        self.text.bind("<Control-O>", self.askOpen)
         self.text.bind("<Control-s>", self.save)
+        self.text.bind("<Control-S>", self.save)
         self.text.bind("<Control-a>", self.selectAll)
-        self.text.bind("<Control-Shift-d>", self.duplicateLine)
+        self.text.bind("<Control-A>", self.selectAll)
         self.text.bind("<Control-d>", self.nextMatch)
+        self.text.bind("<Control-D>", self.nextMatch)
         self.text.bind("<Control-z>", self.undo)
+        self.text.bind("<Control-Z>", self.undo)
         self.text.bind("<Control-y>", self.redo)
+        self.text.bind("<Control-Y>", self.redo)
+        self.text.bind("<Control-f>", self.findreplace)
+        self.text.bind("<Control-F>", self.findreplace)
+        self.text.bind("<Control-Shift-d>", self.duplicateLine)
+        self.text.bind("<Control-Shift-D>", self.duplicateLine)
         self.text.bind("<Control-Tab>", self.nextTab)
         self.text.bind("<Control-Return>", lambda x:self.run(self.activeFile.split("/")[-1], shortcut=True))
         self.text.bind("<Control-Shift-Return>", lambda x:self.compile(self.activeFile.split("/")[-1], shortcut=True))
+        self.text.bind("<Button-1>",self.select_to_mark)
         self.command.bind("<Tab>", self.suggest)
         self.command.bind("<Return>", self.runCommand)
-        self.command.bind("<FocusOut>",self.addPlaceholder)
-        self.command.bind("<FocusIn>",self.removePlaceholder)
+        self.command.bind("<FocusOut>",lambda x:self.addPlaceholder(widget=self.command,type="command"))
+        self.command.bind("<FocusIn>",lambda x: self.removePlaceholder(widget=self.command,type="command"))
         self.protocol("WM_DELETE_WINDOW", self.exit)
 
     def writeResponse(self,res):
@@ -143,17 +168,50 @@ class Notepad(Tk):
         self.response.insert(0, res)
         self.response.config(state=DISABLED)
 
-    def addPlaceholder(self,*args):
-        if(not self.command.get()):
-            self.command.insert(0,"#Press Esc to enter a command....For all commands, run :list ")
-            self.command.config(fg="#707070",font="courier 12 italic")
+    def addPlaceholder(self,widget,type,*args):
+        if(not widget.get()):
+            if(type == "command" and not self.is_command_placeholder):
+                widget.insert(0,"#Press Esc to enter a command....For all commands, run :list ")
+                widget.config(fg="#606060",font="courier 12 italic")
+                self.is_command_placeholder=True
+                widget.icursor(0)
+            elif(type=="find" and not self.is_find_placeholder):
+                print("adsssd placeholder called")
+                log.info("Find Placeholder Added")
+                widget.insert(0, "Find")
+                widget.config(fg="#606060", font="courier 12 italic")
+                self.is_find_placeholder=True
+                self.text.tag_remove("sel","1.0","end")
+                self.text.tag_remove("select","1.0","end")
+                widget.icursor(0)
+            elif(type=="replace" and not self.is_replace_placeholder):
 
-    def removePlaceholder(self,*args):
-        self.command.delete(0,END)
-        self.command.config(fg='white', font = "courier 14 normal")
+                log.info("Replace Placeholder Added")
+                widget.insert(0, "Replace")
+                widget.config(fg="#606060", font="courier 12 italic")
+                self.is_replace_placeholder=True
+                widget.icursor(0)
+
+    def removePlaceholder(self, widget,type, *args):
+        print("remove Placeholder called")
+        if(type=="command" and self.is_command_placeholder):
+            self.is_command_placeholder=False
+            widget.delete(0, END)
+            widget.config(fg='#AFAFAF', font="courier 12 normal")
+        elif(type=="find" and self.is_find_placeholder):
+            log.info("Find Placeholder removed")
+            self.is_find_placeholder=False
+            widget.delete(0, END)
+            widget.config(fg='#AFAFAF', font="courier 12 normal")
+        if(type=="replace" and self.is_replace_placeholder):
+            log.info("Replace Placeholder removed")
+            self.is_replace_placeholder=False
+            widget.delete(0, END)
+            widget.config(fg='#AFAFAF', font="courier 12 normal")
+
 
     def commandMode(self,*args):
-        self.command.delete(0,END)
+        self.removePlaceholder(widget=self.command,type="command")
         self.command.focus_set()
 
     def runCommand(self,*args):
@@ -165,11 +223,8 @@ class Notepad(Tk):
             self.response.config(state=DISABLED)
         else:
             command = command[1:].split(" ")
-            print("command1",command)
             command=list(filter(lambda x: x != "", command))
-            print("command2 ",command)
             fun,args = command[0],command[1:]
-            print("fun , args ",fun , args)
             if len(command)==2 and args[0]=="-help":
                 status=self.command_map[fun][0]
             else:
@@ -194,14 +249,14 @@ class Notepad(Tk):
 
         elif (extension == "cpp"):
             if(mode=="run"):
-                command = f"cd {location} && g++ {file} -o {file.split('.')[0]} && '{location}'{file.split('.')[0]}"
+                command = f"cd {location} && g++ {location}{file} -o {file.split('.')[0]} && {file.split('.')[0]}"
             elif (mode == "compile"):
                 command = f"cd {location} && g++ {file} -o {file.split('.')[0]}"
 
 
         elif (extension == "c"):
             if (mode == "run"):
-                command = f"cd {location} && gcc {file} -o {file.split('.')[0]} && '{location}'{file.split('.')[0]}"
+                command = f"cd {location} && gcc {file} -o {file.split('.')[0]} && {location}{file.split('.')[0]}"
             elif(mode == "compile"):
                 command = f"cd '{location}' && gcc {file} -o {file.split('.')[0]}"
 
@@ -245,11 +300,10 @@ class Notepad(Tk):
 
         command = self.generateCompileRunCommand(file=file, mode="run")
         self.writeResponse(command)
-        print(command)
         output = "Make Sure all inputs are seperated by newline !!\n"
         error=""
         exit_status=""
-        timeout=2
+        timeout=5
         input=self.input.get(1.0,END)
         try:
             res = sp.run(command, stdout=sp.PIPE, input=input,
@@ -265,12 +319,10 @@ class Notepad(Tk):
             error=err.stderr
             exit_status=f"\nTimeoutExpired : Command '{args}' timed out after {timeout}s"
         except Exception as err:
-            print("error : ",err)
             error=err
             output=""
 
         else:
-            print("no exception : ",res)
             error=""
             output=f"{res.stdout}\n"
             exit_status = f"\nProcess returned with exit code {res.returncode}"
@@ -323,12 +375,10 @@ class Notepad(Tk):
             error=err.stderr
             exit_status=f"\nTimeoutExpired : Command '{args}' timed out after {timeout}s"
         except Exception as err:
-            print("error : ",err)
             error=err
             output=""
 
         else:
-            print("no exception : ",res)
             error=""
             output=f"File Compiled Successfully.\n"
             exit_status = f"\nProcess returned with exit code {res.returncode}"
@@ -397,8 +447,6 @@ class Notepad(Tk):
         return f"Present Working Directory :  {self.working_directory}"
 
     def delete(self,*args):
-        print("len ",len(args))
-        print("args= ",args)
         deleted=0
         not_exist=""
         files,folders=0,0
@@ -455,7 +503,6 @@ class Notepad(Tk):
                 count+=1
             else:
                 fails+=1
-            print(self.getAbsolutePath(file))
         return f"{count} Files Opened, {fails} Does not Exists. "
     def listCommands(self,*args):
         info=""
@@ -473,6 +520,7 @@ class Notepad(Tk):
             return self.working_directory+path
 
     def menuBar(self):
+
         mainMenu = Menu(self, bg="#212121", fg="white", bd=0)
         for name, options in self.menuItems.items():
             subMenu = Menu(mainMenu, tearoff=0)
@@ -482,16 +530,16 @@ class Notepad(Tk):
                     fn_name = "askOpen"
                 function = getattr(self, fn_name) if fn_name in dir(self) else " "
 
-                subMenu.add_command(label=option_name, command=function)
+                subMenu.add_command(label=option_name,  command=function)
             mainMenu.add_cascade(label=name, menu=subMenu)
         self.config(menu=mainMenu)
 
     def commandPanel(self):
-        frame = Frame(self, height=30, bg="#212121")
+        frame = Frame(self, height=30, bg="#212121",pady=5)
 
         self.command = Entry(frame, bg="#212121",fg="white", highlightthickness=0, bd=0, font="courier 14 normal",
                              insertbackground="white")
-        self.addPlaceholder()
+        self.addPlaceholder(self.command,type="command")
         self.command.pack(expand=1,fill=BOTH)
         frame.pack(fill=X)
 
@@ -529,7 +577,7 @@ class Notepad(Tk):
             output_label = Label(label_frame, text="Output", bg="#212121", fg="white")
             output_label.pack(side=LEFT)
 
-            close_button = Button(label_frame, bg="#212121", bd=0,activebackground="#2B2B2B",
+            close_button = Button(label_frame, bg="#212121", bd=0,activebackground="#1E1E1E",
                                   activeforeground="white", highlightthickness=0,
                                   fg="white",text="X", command=self.closeOutputWindow)
 
@@ -548,6 +596,8 @@ class Notepad(Tk):
 
             self.output.tag_configure("error_msg", foreground='#FF2500')
             self.output.tag_configure("exit_status", font="courier 14 italic")
+
+
     def closeOutputWindow(self):
         self.io_frame.grid_forget()
         self.frame.grid_rowconfigure(0,weight=1)
@@ -583,7 +633,6 @@ class Notepad(Tk):
                 wordend=wordstart=i+1
 
         suggestions = self.searchtrie.prefix_words(word)
-        print(suggestions)
         if(suggestions):
             self.writeResponse("\t".join(list(map(lambda x: word+x, suggestions))))
             self.text.insert("insert",suggestions[0])
@@ -627,13 +676,13 @@ class Notepad(Tk):
         self.scrollbar = Scrollbar(self.frame)
         self.scrollbar.grid(row=0,column=2,sticky="nse")
 
-        self.lines = Text(self.frame, width=4, bg="#333333", fg="#DCE3F4", bd=0,
+        self.lines = Text(self.frame, width=4, bg="#272727", fg="#DCE3F4", bd=0,
                           highlightthickness=0, padx=5,yscrollcommand=self.updateScroll)
         self.lines.tag_configure('line', justify='right')
         self.lines.config(font=(self.font_face, self.font_size, self.font_style.lower()))
         self.lines.grid(row=0,column=0,sticky="nsw")
 
-        self.text = Text(self.frame, bg="#2B2B2B", fg="white", bd=0, highlightthickness=0,padx=10,
+        self.text = Text(self.frame, bg="#1E1E1E", fg="white", bd=0, highlightthickness=0,padx=10,
                          insertbackground="white", yscrollcommand=self.updateScroll,
                          selectbackground="#214283",undo=True)
         self.text.config(font=(self.font_face, self.font_size, self.font_style.lower()))
@@ -654,12 +703,138 @@ class Notepad(Tk):
         self.text.tag_configure('orange', foreground='#FF7019')
         self.text.tag_configure('blue', foreground='blue')
         self.text.tag_configure('green', foreground='#05FF00')
+        self.text.tag_configure('select',background="#0054CE")
+        self.text.tag_config('mark',background="#9D9A07")
 
         self.text.bind("<KeyRelease> ", self.textUpdated)
         self.text.bind("<Tab> ", self.tab)
         self.text.bind("<Return> ", self.enter)
 
         self.scrollbar.config(command=self.scrollBoth)
+
+    def findreplace(self,event=None):
+        log.info("Opening Find Box...")
+        #LAYOUT
+        self.findwindow = Frame(self.text,bg="#252525", height=10, padx=15,pady=5)
+
+        # Find Replace Boxes
+        find=Entry(self.findwindow,bg="#3C3C3C",fg="#AFAFAF",bd=0,width=30,font="arial 12 normal")
+        replace=Entry(self.findwindow,bg="#3C3C3C",fg="#AFAFAF",bd=0, width=30,font="arial 12 normal")
+        find.grid(row=0, column=0, pady=5)
+        replace.grid(row=1,column=0,pady=5)
+
+        # Mathces Found INFO
+        self.matched_info=Label(self.findwindow,text="No Matches",bg="#252525",fg="#CB1A16",font="arial 9 bold",padx=5)
+        self.matched_info.grid(row=0,column=1)
+
+        # Next/Previous match and close btn
+        next = Button(self.findwindow,bg="#252525", bd=0,width=25,height=25, image=self.icons.down_arrow,
+                      activebackground="#151515",cursor="arrow",command=lambda : self.findnext(find.get()))
+        prev = Button(self.findwindow,bg="#252525", bd=0,width=25,height=25, image=self.icons.up_arrow,
+                      activebackground="#151515",cursor="arrow",command=lambda : self.findprev(find.get()))
+        close = Button(self.findwindow,bg="#252525",bd=0, image=self.icons.times,cursor="arrow",activebackground="#252525",compound=RIGHT,command=self.close_findreplace)
+        next.grid(row=0, column=2)
+        prev.grid(row=0, column=3)
+        close.grid(row=0, column=4,sticky="e")
+        self.findwindow.grid_columnconfigure(4,weight=35, uniform="uniform")
+
+        # Replace buttons
+        rep = Button(self.findwindow,bg="#404040",fg="#CECECE", bd=0, text='Replace',activeforeground="#CECECE",activebackground="#151515",cursor="arrow",padx=10)
+        repall = Button(self.findwindow,bg="#404040",fg="#CECECE", bd=0, text='Replace All',activeforeground="#CECECE",activebackground="#151515",cursor="arrow",padx=10)
+        rep.grid(row=1, column=1)
+        repall.grid(row=1, column=2,columnspan=2)
+
+        self.findwindow.place(in_=self.text,relx=1,rely=0,anchor=NE)
+
+        #Utilities
+        self.addPlaceholder(widget=find,type="find")
+        self.addPlaceholder(widget=replace,type="replace")
+        find.focus_set()
+        #Event Bindings
+
+
+        next.bind("<Enter>",lambda x: next.config(background="#202020"))
+        next.bind("<Leave>",lambda x: next.config(background="#252525"))
+        prev.bind("<Enter>",lambda x: prev.config(background="#202020"))
+        prev.bind("<Leave>",lambda x: prev.config(background="#252525"))
+        find.bind("<FocusIn>",lambda x: find.icursor(0) if self.is_find_placeholder else None)
+        find.bind("<KeyPress>",lambda x:self.removePlaceholder(widget=find,type="find"))
+        find.bind("<KeyRelease>",lambda x:self.addPlaceholder(widget=find,type="find") if not find.get() else self.allMatch(find.get()))
+        find.bind("<FocusOut>",lambda x: self.addPlaceholder(widget=find,type="find"))
+        replace.bind("<FocusIn>",lambda x: replace.icursor(0))
+        replace.bind("<KeyPress>",lambda x:self.removePlaceholder(widget=replace,type="replace"))
+        replace.bind("<KeyRelease>",lambda x:self.addPlaceholder(widget=replace,type="replace") if not replace.get() else None)
+        replace.bind("<FocusOut>",lambda x: self.addPlaceholder(widget=replace,type="replace"))
+
+
+
+
+    def close_findreplace(self):
+        self.findwindow.place_forget()
+        self.text.tag_remove("select","1.0","end")
+        self.text.tag_remove("mark","1.0","end")
+        self.is_find_placeholder=False
+        self.is_replace_placeholder=False
+
+    def select_to_mark(self,*args):
+        selects = list(self.text.tag_ranges("select"))
+        for i in range(0,len(selects),2):
+            self.text.tag_remove("select",selects[i],selects[i+1])
+            self.text.tag_add("mark",selects[i],selects[i+1])
+
+
+
+
+
+    def findnext(self,word):
+        if(word and not self.is_find_placeholder): #EXCLUDE FORM FINDING TEXT PLACEHOLDER TEXT
+
+            index=""
+            try:
+                selection = self.text.selection_get()
+            except:
+                index = self.text.search(word, self.text.index(INSERT), "end")
+            else:
+                if(selection==word):
+                    index=self.text.search(word,"sel.last","end")
+                else:
+                    index=self.text.search(word,self.text.index(INSERT),"end")
+                self.text.tag_add("mark","sel.first","sel.last")
+                self.text.tag_remove("select","sel.first","sel.last")
+                self.text.tag_remove("sel","sel.first","sel.last")
+
+            if (not index):
+                index = self.text.search(word, "1.0", "end")
+            if index:
+                line, col = map(int, index.split("."))
+                w=self.focus_get()
+                self.text.focus_set()
+                self.text.tag_remove("mark", f"{line}.{col}", f"{line}.{col + len(word)}")
+                self.text.tag_add("sel", f"{line}.{col}", f"{line}.{col + len(word)}")
+                self.text.tag_add("select", f"{line}.{col}", f"{line}.{col + len(word)}")
+
+                w.focus_set()
+
+    def findprev(self,word):
+        select = list(self.text.tag_nextrange("select",1.0,END))
+        if(select):
+            self.text.tag_remove("sel",select[0],select[1])
+            self.text.tag_remove("select",select[0],select[1])
+            self.text.tag_add("mark",select[0],select[1])
+            prev=list(self.text.tag_prevrange("mark",select[0]))
+
+        else:
+            prev=list(self.text.tag_prevrange("mark",self.text.index(INSERT)))
+
+        if(not prev):
+            prev = list(self.text.tag_prevrange("mark",END))
+        if(prev):
+            self.text.tag_remove("mark",prev[0],prev[1])
+            self.text.tag_add("select",prev[0],prev[1])
+            self.text.tag_add("sel",prev[0],prev[1])
+
+
+
     def nextMatch(self,*args):
         if(not self.findnextword):
             try:
@@ -668,6 +843,8 @@ class Notepad(Tk):
                 return "break"
         word= self.findnextword
         index = self.text.search(word,"sel.last","end")
+
+
         if (not index):
             index = self.text.search(word,"1.0","sel.first")
         if index:
@@ -677,26 +854,26 @@ class Notepad(Tk):
 
         return "break"
 
-    def allMatch(self,*args):
-        if(not self.findnextword):
-            self.findnextword = self.text.selection_get()
-        word= self.findnextword
+    def allMatch(self,word):
         text = self.text.get("1.0","end")
+        self.text.tag_remove("mark","1.0","end")
         length,sublen = len(text),len(word)
         line,col=1,0
+        matches=0
         for i in range(length):
             if(text[i] == '\n'):
                 line+=1
                 col=0
                 continue
             if(i+sublen<length):
-                print(f"{line}.{col}",end=" ")
                 if(text[i:i+sublen]==word):
-                    self.text.tag_add("sel",f"{line}.{col}",f"{line}.{col+sublen}")
-                    break
+                    matches+=1
+                    self.text.tag_add("mark",f"{line}.{col}",f"{line}.{col+sublen}")
+
 
             col+=1
-        print(line)
+        self.matched_info["text"]=f"{matches} Matches"
+        self.findnext(word)
         return "break"
 
     def colorWord(self,word,linenum,first,last,string=False):
@@ -767,7 +944,7 @@ class Notepad(Tk):
                         self.activeFile+="*"
                         self.tabs[i]["tab"].config(text=self.activeFile.split("/")[-1])
 
-        if(event and event!="state"):
+        if(event and type(event)==str):
             brackets={"<": ">" , "{": "}", "(": ")","[": "]"}
             if(event.char in  brackets):
                 self.text.insert("insert",brackets[event.char])
@@ -776,7 +953,6 @@ class Notepad(Tk):
 
 
     def updateLines(self,event=None):
-        # print("updating line numbers")
         if(event=="closed"):
             i=1
         else:
@@ -788,7 +964,7 @@ class Notepad(Tk):
         self.lines.insert(1.0, self.linenum)
         self.lines.config(state=DISABLED)
         self.lines.tag_add("line", "1.0", "end")
-        self.lines.see(self.text.index(INSERT))
+        self.lines.see(self.text.index("insert+4line"))
 
     def scrollBoth(self, action, position, type=None):
         self.text.yview_moveto(position)
@@ -809,16 +985,15 @@ class Notepad(Tk):
         newtabname=newtab.split("/")[-1]
         tf=Frame(self.panel_frame, bd=1, height=25, width=120, bg="#212121")
         tf.pack(fill=X, side=LEFT)
-        tabs = Button(tf, text=newtabname,width=100,height=2, bg="#353535", fg="white", anchor="nw", bd=0,
+        tabs = Button(tf, text=newtabname,width=100,height=2, bg="#1E1E1E", fg="white", anchor="nw", bd=0,
                       highlightthickness=0,relief=SUNKEN, command=lambda: self.changePanel(newtab))
-        close = Button(tf, text="x",width=20,height=2, bg="#353535", fg="white", anchor="nw", bd=0,padx=2,
+        close = Button(tf, text="x",width=20,height=2, bg="#1E1E1E", fg="white", anchor="nw", bd=0,padx=2,
                       highlightthickness=0,relief=SUNKEN, command=lambda: self.requestClosePanel(newtab,tf))
         close.place(in_=tf,x=100,y=0)
         tabs.place(in_=tf,x=0,y=0)
         self.tabs.append({"frame":tf, "tab":tabs, "close":close})
 
     def changePanel(self,tab_name):
-        print("changing to panel ", tab_name)
         self.storeCache(self.activeFile)
         for i in range(len(self.openFiles)):
             if(self.openFiles[i]==tab_name):
@@ -827,7 +1002,6 @@ class Notepad(Tk):
                 self.text.delete(1.0,END)
                 self.activeFile=tab_name
                 self.text.insert(1.0,self.fileCache[i])
-                print("changed")
         self.show()
         self.textUpdated()
         self.updateActivePanel()
@@ -853,14 +1027,13 @@ class Notepad(Tk):
 
     def updateActivePanel(self):
         i=self.activeIndex()
-        print(i)
         for j in range(len(self.tabs)):
             if(j==i):
                 self.tabs[i]['tab'].config(bg="#808080")
                 self.tabs[i]['close'].config(bg="#808080")
             else:
-                self.tabs[j]['tab'].config(bg="#353535")
-                self.tabs[j]['close'].config(bg="#353535")
+                self.tabs[j]['tab'].config(bg="#1E1E1E")
+                self.tabs[j]['close'].config(bg="#1E1E1E")
 
     def closePanel(self,tab_name,tf):
         i,length=0,len(self.openFiles)
@@ -886,11 +1059,11 @@ class Notepad(Tk):
 
 
     def requestClosePanel(self,tab_name,tf):
-        print("closing  panel ", tab_name)
         if("*" in self.activeFile):
             self.askSave(tab_name,tf)
         else:
             self.closePanel(tab_name,tf)
+
     def askSave(self,tab_name,tf):
         choice = askyesnocancel("Save Warning!",
                                 "You were exitting without saving your progress.Do you want to Save>")
@@ -902,13 +1075,11 @@ class Notepad(Tk):
 
 
     def askOpen(self,*args):
-        print("Opening File")
-        print("caching... ",self.text.get(1.0,END))
 
         file = askopenfilename(defaultextension=".txt",
-                                          filetypes=[("All Files", "*.*"), ("Text Documents", "*.txt")],
-                                          initialdir=self.working_directory
-                                        )
+                                filetypes=[("All Files", "*.*"), ("Text Documents", "*.txt")],
+                                initialdir=self.working_directory
+                               )
 
         if file:
             self.open(file)
@@ -918,7 +1089,6 @@ class Notepad(Tk):
     def save(self,event=None):
         if("*" in self.activeFile):
             self.activeFile = self.activeFile[:-1]
-        print("Saving ",self.activeFile)
         newfile = "/" not in self.activeFile
         temp=False
         if newfile:
@@ -930,14 +1100,11 @@ class Notepad(Tk):
                 i=self.activeIndex()
                 self.openFiles[i]=temp
                 self.activeFile = temp
-                print("active file is now ", self.activeFile)
-                print("content in  file is :  ", self.text.get(1.0, END))
 
         if(not newfile or temp):
             f = open(self.activeFile, "w")
             f.write(self.text.get(1.0, END))
             f.close()
-        print("now : ",self.activeFile)
         for i in range(len(self.openFiles)):
             if(self.openFiles[i]==self.activeFile):
                 self.tabs[i]["tab"].config(text=self.activeFile.split("/")[-1])
@@ -970,10 +1137,6 @@ class Notepad(Tk):
 
 
     def storeCache(self,tab_name):
-        # print("length open files :",len(self.openFiles))
-        # print("length files cache :",len(self.fileCache))
-        # print("length Tabs :",len(self.tabs))
-        # print("tabname",tab_name)
         for i in range(len(self.openFiles)):
             if(self.openFiles[i]==self.removeStar(tab_name)):
                 self.fileCache[i]=self.text.get(1.0,END)
@@ -985,7 +1148,6 @@ class Notepad(Tk):
         if(self.activeFile):
             self.storeCache(self.activeFile)
             self.text.delete(1.0, END)
-            print("file",file)
 
         if(file):
             if(os.path.isfile(file)):
@@ -1005,7 +1167,6 @@ class Notepad(Tk):
                         i+=1
                         found=0
                         break
-        print("found a new file name ", new_file_name)
         self.openFiles.append(new_file_name)
         self.activeFile=new_file_name
         self.fileCache.append("")
@@ -1031,14 +1192,11 @@ class Notepad(Tk):
     def duplicateLine(self,*args):
         curr_linenum = int(self.text.index(INSERT).split(".")[0])
         curr_line=self.text.get(f"{curr_linenum}.0",f"{curr_linenum}.end")+"\n"
-        print(curr_linenum)
-        print(curr_line)
         self.text.insert(f"{curr_linenum}.0",curr_line)
         self.textUpdated()
         return "break"
 
     def undo(self,*args):
-        print("redo")
         try:
             self.text.edit_undo()
         except TclError:
@@ -1055,16 +1213,11 @@ class Notepad(Tk):
 
     def show(self):
         pass
-        # print("ACTIVE FILE : ", self.activeFile)
-        # print("OPEN FILES : ", self.openFiles)
-        # print("CAched FILES : ", self.fileCache)
 
     def settings(self):
-        print("Opening Settings window")
         self.settings_window=Settings(self)
         self.settings_window.done()
     def exit(self):
-        print("closing settings first")
         if (self.settings_window != None):
             self.settings_window.quit()
             self.settings_window = None
@@ -1095,7 +1248,7 @@ class Settings(Tk):
         self.geometry(f"{int(notepad.width/2)}x{int(notepad.height)}+{int(notepad.width/2)}+0")
         self.categories = ["Appearance", "Editor"]
         self.font_size_options=[i for i in range(8,48)]
-        self.font_face_options=["Arial", "Courier", "Times", "courier"]
+        self.font_face_options=font.families()
         self.font_style_options=["Normal", "Bold", "Italic", "Bold Italic"]
         self.activeTab=None
         self.tabsPanel()
@@ -1107,13 +1260,13 @@ class Settings(Tk):
         for c in self.categories:
             tf = Frame(self.panel_frame, bd=1, height=25, width=125, bg="#212121")
             tf.pack(fill=X, side=LEFT)
-            tabs = Button(tf, text=c, width=12, height=2, bg="#353535", fg="white", anchor="nw", bd=0,
+            tabs = Button(tf, text=c, width=12, height=2, bg="#1E1E1E", fg="white", anchor="nw", bd=0,
                           highlightthickness=0, relief=SUNKEN, command=lambda: 1)
             tabs.place(in_=tf, x=0, y=0)
         self.activeTab=self.categories[0]
 
     def mainarea(self):
-        frame=Frame(self,bg="#2B2B2B", padx=25, pady=25)
+        frame=Frame(self,bg="#1E1E1E", padx=25, pady=25)
         frame.pack(fill=BOTH, expand=1)
         if(self.activeTab == "Appearance"):
             self.appearance(frame)
@@ -1130,21 +1283,21 @@ class Settings(Tk):
         self.font_size = Combobox(font_frame, values=self.font_size_options, width=10)
         self.font_size.set(self.notepad.font_size)
         self.font_size.bind("<<ComboboxSelected>>",self.change)
-        self.font_size.grid(row=2,column=3)
+        self.font_size.grid(row=2,column=3,sticky="w")
 
         # FONT FACE
         Label(font_frame, text="Font Face : ", bg="#444749", fg="white", font="arial 16 italic", padx=5, pady=5).grid(row=3,column=2)
-        self.font_face = Combobox(font_frame, values=self.font_face_options, width=10)
+        self.font_face = Combobox(font_frame, values=self.font_face_options, width=30)
         self.font_face.set(self.notepad.font_face)
         self.font_face.bind("<<ComboboxSelected>>", self.change)
-        self.font_face.grid(row=3, column=3)
+        self.font_face.grid(row=3, column=3,sticky="w")
 
         #FONT STYLE
         Label(font_frame, text="Font Style : ", bg="#444749", fg="white", font="arial 16 italic", padx=5, pady=5).grid(row=4,column=2)
         self.font_style = Combobox(font_frame, values=self.font_style_options, width=10)
         self.font_style.set(self.notepad.font_style)
         self.font_style.bind("<<ComboboxSelected>>", self.change)
-        self.font_style.grid(row=4, column=3)
+        self.font_style.grid(row=4, column=3,sticky="w")
 
 
         font_frame.pack(fill=X,pady=10)
@@ -1165,7 +1318,6 @@ class Settings(Tk):
         theme_frame.pack(fill=X, pady=10)
 
     def changeOpacity(self,opacity):
-        print(opacity)
         self.notepad.opacity = opacity
         self.notepad.attributes("-alpha",float(float(opacity)/100.0))
     def change(self,event):
@@ -1185,7 +1337,8 @@ class Settings(Tk):
 
 
 
-w=Notepad()
 
+log.basicConfig(filename="editor.log",filemode='w',format='%(asctime)s - %(message)s',datefmt='%H:%M:%S',level=log.INFO)
+w=Notepad()
 w.new()
 w.done()
